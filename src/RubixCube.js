@@ -6,10 +6,37 @@ import {
     Vector3,
 } from "three"
 
+function mapNums(num) {
+    if (num === 1) {
+        return { start: 0, end: 0 }
+    } else if (num === 0) {
+        return { start: 0, end: 2 }
+    } else {
+        return { start: 2, end: 2 }
+    }
+}
+
 export default class RubixCube {
     constructor(width = 1) {
         this.width = width
-        this.cubes = this.createRubixCube(width)
+        this.cubeMeshes = this.createRubixCube(width)
+        this.cubes = [
+            [
+                [111, 112, 113],
+                [121, 122, 123],
+                [131, 132, 133],
+            ],
+            [
+                [211, 212, 213],
+                [221, 222, 223],
+                [231, 232, 233],
+            ],
+            [
+                [311, 312, 313],
+                [321, 322, 323],
+                [331, 332, 333],
+            ],
+        ]
     }
 
     createRubixCube(width) {
@@ -104,32 +131,95 @@ export default class RubixCube {
         )
         const point = side
 
-        function mapNums(num) {
-            if (num === 0) {
-                return { start: 0, end: 2 }
-            } else if (num === -1) {
-                return { start: 2, end: 2 }
-            } else {
-                return { start: 0, end: 0 }
-            }
-        }
-        let sideCubes = []
         const { start: iStart, end: iEnd } = mapNums(side.x)
         const { start: jStart, end: jEnd } = mapNums(side.y)
         const { start: kStart, end: kEnd } = mapNums(side.z)
         for (let i = iStart; i <= iEnd; i++) {
             for (let j = jStart; j <= jEnd; j++) {
                 for (let k = kStart; k <= kEnd; k++) {
-                    sideCubes.push(this.cubes[i][j][k])
+                    let cube = this.cubeMeshes[i][j][k]
+                    cube.position.sub(point)
+                    cube.position.applyAxisAngle(axis, angle)
+                    cube.position.add(point)
+                    cube.rotateOnWorldAxis(axis, angle)
                 }
             }
         }
+    }
 
-        sideCubes.forEach((cube) => {
-            cube.position.sub(point)
-            cube.position.applyAxisAngle(axis, angle)
-            cube.position.add(point)
-            cube.rotateOnAxis(axis, angle)
-        })
+    /* 
+    11 12 13  R  31 21 11
+    21 22 23 ->  32 22 12 
+    31 32 33     33 23 13
+
+    11 12 13  L  13 23 33
+    21 22 23 ->  12 22 32 
+    31 32 33     11 21 31
+    */
+    adjustCubesArray(side, direction) {
+        const { start: iStart, end: iEnd } = mapNums(side.x)
+        const { start: jStart, end: jEnd } = mapNums(side.y)
+        const { start: kStart, end: kEnd } = mapNums(side.z)
+
+        let newPositions = []
+        // Rotate the elements in the specified side of the cube.
+        for (let i = iStart; i <= iEnd; i++) {
+            for (let j = jStart; j <= jEnd; j++) {
+                for (let k = kStart; k <= kEnd; k++) {
+                    // Determine the new position of the element based on its current position
+                    // and the direction of rotation.
+                    let newI, newJ, newK
+                    switch (direction) {
+                        case 1:
+                            if (iEnd - iStart === 0) {
+                                newI = i
+                                newJ = kEnd - k
+                                newK = j
+                            } else if (jEnd - jStart === 0) {
+                                newI = kEnd - k
+                                newJ = j
+                                newK = i
+                            } else {
+                                newI = jEnd - j
+                                newJ = i
+                                newK = k
+                            }
+                            break
+                        case -1:
+                            if (iEnd - iStart === 0) {
+                                newI = i
+                                newJ = k
+                                newK = jEnd - j
+                            } else if (jEnd - jStart === 0) {
+                                newI = k
+                                newJ = j
+                                newK = iEnd - i
+                            } else {
+                                newI = j
+                                newJ = iEnd - i
+                                newK = k
+                            }
+                            break
+                        default:
+                            throw new Error(`Invalid direction: ${direction}`)
+                    }
+
+                    newPositions.push(this.cubeMeshes[newI][newJ][newK])
+                }
+            }
+        }
+        for (let i = iStart; i <= iEnd; i++) {
+            for (let j = jStart; j <= jEnd; j++) {
+                for (let k = kStart; k <= kEnd; k++) {
+                    if (iEnd - iStart === 0) {
+                        this.cubeMeshes[i][j][k] = newPositions[3 * j + k]
+                    } else if (jEnd - jStart === 0) {
+                        this.cubeMeshes[i][j][k] = newPositions[3 * i + k]
+                    } else {
+                        this.cubeMeshes[i][j][k] = newPositions[3 * i + j]
+                    }
+                }
+            }
+        }
     }
 }
